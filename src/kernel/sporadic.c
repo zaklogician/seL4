@@ -168,6 +168,29 @@ void refill_new(sched_context_t *sc, word_t max_refills, ticks_t budget, ticks_t
     REFILL_SANITY_CHECK(sc, budget);
 }
 
+void refill_update_foo1(sched_context_t *sc);
+void refill_update_foo1(sched_context_t *sc) {
+    *refill_index(sc, 0) = *refill_head(sc);
+}
+
+void refill_update_foo2(sched_context_t *sc, ticks_t new_budget);
+void refill_update_foo2(sched_context_t *sc, ticks_t new_budget) {
+    refill_head(sc)->rAmount = new_budget;
+}
+
+void refill_update_foo3(sched_context_t *sc);
+void refill_update_foo3(sched_context_t *sc) {
+    maybe_add_empty_tail(sc);
+}
+
+void refill_update_foo4(sched_context_t *sc, ticks_t new_period, ticks_t new_budget);
+void refill_update_foo4(sched_context_t *sc, ticks_t new_period, ticks_t new_budget) {
+    refill_t new = { .rAmount = (new_budget - refill_head(sc)->rAmount),
+                     .rTime = refill_head(sc)->rTime + new_period
+                   };
+    refill_add_tail(sc, new);
+}
+
 void refill_update(sched_context_t *sc, ticks_t new_period, ticks_t new_budget, word_t new_max_refills)
 {
 
