@@ -203,7 +203,9 @@ void refill_update(sched_context_t *sc, ticks_t new_period, ticks_t new_budget, 
     /* move the head refill to the start of the list - it's ok as we're going to truncate the
      * list to size 1 - and this way we can't be in an invalid list position once new_max_refills
      * is updated */
-    *refill_index(sc, 0) = *refill_head(sc);
+    refill_t * the_zero = refill_index(sc, 0);
+    refill_t * the_head = refill_head(sc);
+    *the_zero = *the_head;
     sc->scRefillHead = 0;
     /* truncate refill list to size 1 */
     sc->scRefillTail = sc->scRefillHead;
@@ -231,7 +233,7 @@ void refill_update(sched_context_t *sc, ticks_t new_period, ticks_t new_budget, 
     REFILL_SANITY_CHECK(sc, new_budget);
 }
 
-static inline void schedule_used(sched_context_t *sc, refill_t new)
+static NO_INLINE void schedule_used(sched_context_t *sc, refill_t new)
 {
     /* schedule the used amount */
     if (new.rAmount < MIN_BUDGET && !refill_single(sc)) {
@@ -245,7 +247,7 @@ static inline void schedule_used(sched_context_t *sc, refill_t new)
     }
 }
 
-static inline void ensure_sufficient_head(sched_context_t *sc)
+static NO_INLINE void ensure_sufficient_head(sched_context_t *sc)
 {
     /* ensure the refill head is sufficient, such that when we wake in awaken,
      * there is enough budget to run */
@@ -255,6 +257,23 @@ static inline void ensure_sufficient_head(sched_context_t *sc)
         /* this loop is guaranteed to terminate as the sum of
          * rAmount in a refill must be >= MIN_BUDGET */
     }
+}
+
+uint64_t refill_budget_check_loop(sched_context_t *sc, uint64_t usageA) {
+   uint64_t usage = usageA;
+    while (refill_head(sc)->rAmount <= usage) {
+        /* exhaust and schedule replenishment */
+        usage -= refill_head(sc)->rAmount;
+        if (refill_single(sc)) {
+            /* update in place */
+            refill_head(sc)->rTime += sc->scPeriod;
+        } else {
+            refill_t old_head = refill_pop_head(sc);
+            old_head.rTime = old_head.rTime + sc->scPeriod;
+            schedule_used(sc, old_head);
+        }
+    }
+    return usage;
 }
 
 void refill_budget_check(ticks_t usage)
@@ -267,18 +286,7 @@ void refill_budget_check(ticks_t usage)
     REFILL_SANITY_START(sc);
 
     if (capacity == 0) {
-        while (refill_head(sc)->rAmount <= usage) {
-            /* exhaust and schedule replenishment */
-            usage -= refill_head(sc)->rAmount;
-            if (refill_single(sc)) {
-                /* update in place */
-                refill_head(sc)->rTime += sc->scPeriod;
-            } else {
-                refill_t old_head = refill_pop_head(sc);
-                old_head.rTime = old_head.rTime + sc->scPeriod;
-                schedule_used(sc, old_head);
-            }
-        }
+        usage = refill_budget_check_loop(sc, usage);
 
         /* budget overrun */
         if (usage > 0) {

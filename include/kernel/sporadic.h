@@ -44,7 +44,7 @@ static inline refill_t *refill_index(sched_context_t *sc, word_t index)
 {
     return ((refill_t *)(SC_REF(sc) + sizeof(sched_context_t))) + index;
 }
-static inline refill_t *refill_head(sched_context_t *sc)
+static NO_INLINE refill_t *refill_head(sched_context_t *sc)
 {
     return refill_index(sc, sc->scRefillHead);
 }
@@ -131,6 +131,8 @@ void refill_new(sched_context_t *sc, word_t max_refills, ticks_t budget, ticks_t
 /* Update refills in an active sc without violating bandwidth constraints */
 void refill_update(sched_context_t *sc, ticks_t new_period, ticks_t new_budget, word_t new_max_refills);
 
+
+uint64_t refill_budget_check_loop(sched_context_t *sc, uint64_t usageA);
 
 /* Charge `usage` to the current scheduling context.
  * This function should only be called only when charging `used` will deplete
